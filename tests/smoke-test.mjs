@@ -122,7 +122,11 @@ try {
 
   if (flags.includes("--pair")) {
     const pair = await page("window.electronAPI.bitecodesLogin()")
-    check("live sign-in starts (code issued)", pair?.phase === "waiting" && /^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(pair.userCode ?? ""), pair?.phase)
+    check(
+      "live sign-in starts (code issued)",
+      pair?.phase === "waiting" && /^[A-Z2-9]{4}-[A-Z2-9]{4}$/.test(pair.userCode ?? ""),
+      pair?.phase === "waiting" ? pair.phase : JSON.stringify(pair),
+    )
     await page("window.electronAPI.bitecodesCancel()")
   }
 

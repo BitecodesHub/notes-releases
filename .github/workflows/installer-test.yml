@@ -73,7 +73,7 @@ jobs:
           - runner: macos-14
             dmg: "Notes-${VERSION}-arm64.dmg"
             arch: arm64
-          - runner: macos-13
+          - runner: macos-15-intel
             dmg: "Notes-${VERSION}.dmg"
             arch: x64
     runs-on: ${{ matrix.runner }}
