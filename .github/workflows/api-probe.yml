@@ -1,0 +1,24 @@
+name: API probe
+
+# Calls the live desktop sign-in API from clean CI machines and prints the
+# HTTP status and body (codes redacted), to diagnose server-side failures.
+on: workflow_dispatch
+
+jobs:
+  probe:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Probe pair endpoint
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            curl -s -m 30 -w "\nHTTP %{http_code} via %{remote_ip}\n" -X POST https://www.bitecodes.com/api/v1/desktop/pair \
+              -H "Content-Type: application/json" -H "X-Notes-Client: Notes/1.8.2 (probe)" -d '{"label":"Notes on macOS"}' \
+              | sed -E 's/"(deviceCode|userCode)":"[^"]*"/"\1":"…"/g'
+            sleep 2
+          done
+          curl -s -m 30 -o /dev/null -w "version feed: %{http_code}\n" "https://www.bitecodes.com/api/v1/desktop/version?version=1.8.2&platform=darwin&arch=arm64"
