@@ -120,6 +120,11 @@ try {
   const update = await page("window.electronAPI.updateCheck()")
   check("live update feed reachable", !!update && update.checkedAt !== null && update.updateRequired === false, JSON.stringify({ latest: update?.latestVersion, available: update?.updateAvailable }))
 
+  if (flags.includes("--sharp")) {
+    const sharp = await main(`(() => { try { const s = process.mainModule.require("sharp"); return typeof s === "function" ? "loaded " + process.arch : "bad export" } catch (e) { return "ERR " + e.message.slice(0, 120) } })()`)
+    check("native image library (sharp) loads", /^loaded/.test(sharp ?? ""), sharp)
+  }
+
   if (flags.includes("--pair")) {
     const pair = await page("window.electronAPI.bitecodesLogin()")
     check(

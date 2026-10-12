@@ -25,8 +25,10 @@ jobs:
         include:
           - runner: windows-latest
             arch: x64
+            extra: --sharp
           - runner: windows-11-arm
             arch: arm64
+            extra: ""
     runs-on: ${{ matrix.runner }}
     name: Windows ${{ matrix.arch }}
     steps:
@@ -38,11 +40,11 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" --pattern "Notes-Setup-${{ inputs.version }}-${{ matrix.arch }}.exe" --dir dl
+        run: gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" --pattern "Notes-Setup-${{ inputs.version }}.exe" --dir dl
       - name: Silent install
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "dl\Notes-Setup-${{ inputs.version }}-${{ matrix.arch }}.exe" -ArgumentList "/S" -Wait -PassThru
+          $p = Start-Process -FilePath "dl\Notes-Setup-${{ inputs.version }}.exe" -ArgumentList "/S" -Wait -PassThru
           "installer exit code: $($p.ExitCode)"
           if ($p.ExitCode -ne 0) { exit 1 }
           $exe = Join-Path $env:LOCALAPPDATA "Programs\Notes\Notes.exe"
@@ -52,7 +54,7 @@ jobs:
           "NOTES_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Smoke test
         shell: pwsh
-        run: node tests/smoke-test.mjs "$env:NOTES_EXE" "${{ inputs.version }}" --pair --screenshot
+        run: node tests/smoke-test.mjs "$env:NOTES_EXE" "${{ inputs.version }}" --pair --screenshot ${{ matrix.extra }}
       - name: Silent uninstall
         if: always()
         shell: pwsh
@@ -71,10 +73,10 @@ jobs:
       matrix:
         include:
           - runner: macos-14
-            dmg: "Notes-${VERSION}-arm64.dmg"
+            dmg: "Notes-${VERSION}-universal.dmg"
             arch: arm64
           - runner: macos-15-intel
-            dmg: "Notes-${VERSION}.dmg"
+            dmg: "Notes-${VERSION}-universal.dmg"
             arch: x64
     runs-on: ${{ matrix.runner }}
     name: macOS ${{ matrix.arch }}
@@ -109,4 +111,4 @@ jobs:
           xattr -d com.apple.quarantine "$APP"
           echo "NOTES_EXE=$APP/Contents/MacOS/Notes" >> $GITHUB_ENV
       - name: Smoke test
-        run: node tests/smoke-test.mjs "$NOTES_EXE" "$VERSION" --pair
+        run: node tests/smoke-test.mjs "$NOTES_EXE" "$VERSION" --pair --sharp
