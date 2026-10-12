@@ -119,3 +119,56 @@ jobs:
           echo "NOTES_EXE=$APP/Contents/MacOS/Notes" >> $GITHUB_ENV
       - name: Smoke test
         run: node tests/smoke-test.mjs "$NOTES_EXE" "$VERSION" --pair --sharp
+
+  windows-upgrade:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: windows-latest
+            arch: x64
+          - runner: windows-11-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    name: Windows ${{ matrix.arch }} upgrade (app running)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Download previous (v1.8.2) and new installers
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download v1.8.2 --repo "${{ github.repository }}" --pattern "Notes-Setup-1.8.2-${{ matrix.arch }}.exe" --dir old
+          gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" --pattern "Notes-Setup-${{ inputs.version }}.exe" --dir new
+      - name: Install 1.8.2 and start it
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "old\Notes-Setup-1.8.2-${{ matrix.arch }}.exe" -ArgumentList "/S" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { throw "old installer exit $($p.ExitCode)" }
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\Notes\Notes.exe"
+          "old version: $((Get-Item $exe).VersionInfo.ProductVersion)"
+          Start-Process -FilePath $exe
+          Start-Sleep -Seconds 12
+          $running = @(Get-Process -Name Notes -ErrorAction SilentlyContinue).Count
+          "Notes processes running before upgrade: $running"
+          if ($running -lt 1) { throw "old app did not start" }
+      - name: Upgrade with the new installer while the app runs
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath "new\Notes-Setup-${{ inputs.version }}.exe" -ArgumentList "/S" -Wait -PassThru
+          "new installer exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "upgrade failed" }
+          Start-Sleep -Seconds 3
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\Notes\Notes.exe"
+          $v = (Get-Item $exe).VersionInfo.ProductVersion
+          "installed version after upgrade: $v"
+          if (-not $v.StartsWith("${{ inputs.version }}")) { throw "expected ${{ inputs.version }}" }
+          Get-Process -Name Notes -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 2
+          "NOTES_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Smoke test the upgraded app
+        shell: pwsh
+        run: node tests/smoke-test.mjs "$env:NOTES_EXE" "${{ inputs.version }}" --screenshot
