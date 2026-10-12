@@ -22,7 +22,7 @@ jobs:
       matrix:
         include:
           - { runner: windows-latest, file: "Notes-Setup-VERSION.exe", label: "x64 · combined" }
-          - { runner: windows-latest, file: "Notes-Setup-VERSION-x64.exe", label: "x64 · x64-only" }
+          - { runner: windows-11-arm, file: "Notes-Setup-VERSION.exe", label: "ARM · combined" }
     runs-on: ${{ matrix.runner }}
     name: ${{ matrix.label }}
     steps:
