@@ -51,6 +51,13 @@ jobs:
           if (-not (Test-Path $exe)) { Get-ChildItem "$env:LOCALAPPDATA\Programs" -Recurse -Depth 2 | Select-Object FullName; throw "Notes.exe not installed at $exe" }
           $lnk = Join-Path ([Environment]::GetFolderPath("Programs")) "Notes.lnk"
           "start menu shortcut: $(Test-Path $lnk)"
+          # The combined installer must install the NATIVE build for this PC.
+          $bytes = [System.IO.File]::ReadAllBytes($exe)
+          $pe = [BitConverter]::ToInt32($bytes, 0x3C)
+          $machine = [BitConverter]::ToUInt16($bytes, $pe + 4)
+          $arch = switch ($machine) { 0x8664 { "x64" } 0xAA64 { "arm64" } default { "0x{0:X}" -f $machine } }
+          "installed Notes.exe architecture: $arch (expected ${{ matrix.arch }})"
+          if ($arch -ne "${{ matrix.arch }}") { throw "installed the $arch build on a ${{ matrix.arch }} machine" }
           "NOTES_EXE=$exe" | Out-File -FilePath $env:GITHUB_ENV -Append
       - name: Smoke test
         shell: pwsh
