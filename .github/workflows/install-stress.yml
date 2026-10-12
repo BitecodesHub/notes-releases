@@ -21,9 +21,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { runner: windows-11-arm, file: "Notes-Setup-VERSION.exe", label: "ARM · combined" }
-          - { runner: windows-11-arm, file: "Notes-Setup-VERSION-arm64.exe", label: "ARM · arm64-only" }
           - { runner: windows-latest, file: "Notes-Setup-VERSION.exe", label: "x64 · combined" }
+          - { runner: windows-latest, file: "Notes-Setup-VERSION-x64.exe", label: "x64 · x64-only" }
     runs-on: ${{ matrix.runner }}
     name: ${{ matrix.label }}
     steps:
@@ -50,4 +49,7 @@ jobs:
             if (-not $ok) { $fail++ }
           }
           "FAILURES: $fail / ${{ inputs.runs }}"
+          # Windows records every process crash (Event 1000) with the module that faulted.
+          Get-WinEvent -FilterHashtable @{ LogName = "Application"; Id = 1000 } -MaxEvents 10 -ErrorAction SilentlyContinue |
+            ForEach-Object { "CRASH " + ($_.Message -replace "\s+", " ").Substring(0, [Math]::Min(420, ($_.Message -replace "\s+", " ").Length)) }
           if ($fail -gt 0) { exit 1 }
