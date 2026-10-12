@@ -1,0 +1,53 @@
+name: Install stress test
+
+# Installs and uninstalls a Windows installer repeatedly (silent) and reports
+# every exit code, to catch intermittent installer crashes.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+      version:
+        required: true
+      runs:
+        default: "10"
+
+permissions:
+  contents: write
+
+jobs:
+  stress:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: windows-11-arm, file: "Notes-Setup-VERSION.exe", label: "ARM · combined" }
+          - { runner: windows-11-arm, file: "Notes-Setup-VERSION-arm64.exe", label: "ARM · arm64-only" }
+          - { runner: windows-latest, file: "Notes-Setup-VERSION.exe", label: "x64 · combined" }
+    runs-on: ${{ matrix.runner }}
+    name: ${{ matrix.label }}
+    steps:
+      - name: Download
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $f = "${{ matrix.file }}".Replace("VERSION", "${{ inputs.version }}")
+          gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" --pattern $f --dir dl
+          "INSTALLER=dl\$f" | Out-File -FilePath $env:GITHUB_ENV -Append
+      - name: Install / uninstall loop
+        shell: pwsh
+        run: |
+          $exe = Join-Path $env:LOCALAPPDATA "Programs\Notes\Notes.exe"
+          $un = Join-Path $env:LOCALAPPDATA "Programs\Notes\Uninstall Notes.exe"
+          $fail = 0
+          for ($i = 1; $i -le [int]"${{ inputs.runs }}"; $i++) {
+            $p = Start-Process -FilePath $env:INSTALLER -ArgumentList "/S" -Wait -PassThru
+            $ok = ($p.ExitCode -eq 0) -and (Test-Path $exe)
+            $u = if (Test-Path $un) { (Start-Process -FilePath $un -ArgumentList "/S" -Wait -PassThru).ExitCode } else { "n/a" }
+            Start-Sleep -Seconds 3
+            "run ${i}: install=$($p.ExitCode) installedOk=$ok uninstall=$u"
+            if (-not $ok) { $fail++ }
+          }
+          "FAILURES: $fail / ${{ inputs.runs }}"
+          if ($fail -gt 0) { exit 1 }
