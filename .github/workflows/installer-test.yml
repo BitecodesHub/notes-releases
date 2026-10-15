@@ -62,6 +62,9 @@ jobs:
       - name: Smoke test
         shell: pwsh
         run: node tests/smoke-test.mjs "$env:NOTES_EXE" "${{ inputs.version }}" --pair --screenshot ${{ matrix.extra }}
+      - name: Full feature test (signed in)
+        shell: pwsh
+        run: node tests/feature-test.mjs "$env:NOTES_EXE" "${{ inputs.version }}"
       - name: Silent uninstall
         if: always()
         shell: pwsh
@@ -119,6 +122,8 @@ jobs:
           echo "NOTES_EXE=$APP/Contents/MacOS/Notes" >> $GITHUB_ENV
       - name: Smoke test
         run: node tests/smoke-test.mjs "$NOTES_EXE" "$VERSION" --pair --sharp
+      - name: Full feature test (signed in)
+        run: node tests/feature-test.mjs "$NOTES_EXE" "$VERSION"
 
   windows-upgrade:
     strategy:
@@ -136,17 +141,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Download previous (v1.8.2) and new installers
+      - name: Download previous (v1.8.3) and new installers
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release download v1.8.2 --repo "${{ github.repository }}" --pattern "Notes-Setup-1.8.2-${{ matrix.arch }}.exe" --dir old
+          gh release download v1.8.3 --repo "${{ github.repository }}" --pattern "Notes-Setup-1.8.3.exe" --dir old
           gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" --pattern "Notes-Setup-${{ inputs.version }}.exe" --dir new
-      - name: Install 1.8.2 and start it
+      - name: Install 1.8.3 and start it
         shell: pwsh
         run: |
-          $p = Start-Process -FilePath "old\Notes-Setup-1.8.2-${{ matrix.arch }}.exe" -ArgumentList "/S" -Wait -PassThru
+          $p = Start-Process -FilePath "old\Notes-Setup-1.8.3.exe" -ArgumentList "/S" -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "old installer exit $($p.ExitCode)" }
           $exe = Join-Path $env:LOCALAPPDATA "Programs\Notes\Notes.exe"
           "old version: $((Get-Item $exe).VersionInfo.ProductVersion)"
